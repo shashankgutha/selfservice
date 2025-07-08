@@ -20,6 +20,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: ${{ github.head_ref }}
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -32,21 +33,24 @@ jobs:
       - name: Get changed files using Git
         id: changed-files
         run: |
-          # Get the base branch commit
-          git fetch origin ${{ github.base_ref }}
+          echo "=== Debug: GitHub context ==="
+          echo "Base ref: ${{ github.base_ref }}"
+          echo "Head ref: ${{ github.head_ref }}"
+          echo "Base SHA: ${{ github.event.pull_request.base.sha }}"
+          echo "Head SHA: ${{ github.event.pull_request.head.sha }}"
           
           echo "=== Debug: All changed files ==="
-          git diff --name-only origin/${{ github.base_ref }}...HEAD
+          git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
           
           echo "=== Debug: Files matching inputs pattern ==="
-          git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '^inputs/' || echo "No files match inputs/ pattern"
+          git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep -E '^inputs/' || echo "No files match inputs/ pattern"
           
           echo "=== Debug: YAML files in inputs ==="
-          git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '^inputs/.*\.yml$' || echo "No YAML files in inputs"
+          git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep -E '^inputs/.*\.yml$' || echo "No YAML files in inputs"
           
           echo "=== Debug: Final filtered files ==="
           # Find changed files matching our pattern - more flexible regex
-          changed_files=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '^inputs/.*\.yml$' | grep -v 'elastic-agent\.yml$' || true)
+          changed_files=$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep -E '^inputs/.*\.yml$' | grep -v 'elastic-agent\.yml$' || true)
           echo "Filtered files: '$changed_files'"
           
           if [ -n "$changed_files" ]; then
