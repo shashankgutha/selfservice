@@ -55,9 +55,9 @@ jobs:
           
           if [ -n "$changed_files" ]; then
             echo "any_changed=true" >> $GITHUB_OUTPUT
-            echo "all_changed_files<<EOF" >> $GITHUB_OUTPUT
-            echo "$changed_files" | tr '\n' ' ' >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            # Convert newlines to spaces and set as single line output
+            files_list=$(echo "$changed_files" | tr '\n' ' ' | sed 's/[[:space:]]*$//')
+            echo "all_changed_files=$files_list" >> $GITHUB_OUTPUT
           else
             echo "any_changed=false" >> $GITHUB_OUTPUT
             echo "all_changed_files=" >> $GITHUB_OUTPUT
