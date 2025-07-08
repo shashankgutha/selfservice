@@ -1,0 +1,67 @@
+name: Update Elastic Agent Config
+
+on:
+  pull_request:
+    paths:
+      - 'inputs/**/**.yml'
+    paths-ignore:
+      - '**/elastic-agent.yml'
+
+jobs:
+  update-config:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v41
+        with:
+          files: |
+            inputs/**.yml
+
+      - name: Run update script
+        id: update_script
+        run: |
+          python .github/scripts/update_elastic_agent.py ${{ steps.changed-files.outputs.all_changed_files }}
+        continue-on-error: true
+
+      - name: Commit files
+        if: steps.update_script.outcome == 'success'
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add .
+          git commit -m "Update elastic-agent.yml from changed inputs" || echo "No changes to commit"
+          git push
+
+      - name: Post PR comment
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const output = `
+            #### ✅ Elastic Agent Config Update
+            **Status:** ${{ steps.update_script.outcome }}
+            
+            **Details:**
+            \`\`\`
+            ${{ steps.update_script.outputs.stdout }}
+            \`\`\`
+            `;
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: output
+            });

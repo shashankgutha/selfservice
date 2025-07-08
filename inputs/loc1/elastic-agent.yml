@@ -1,0 +1,358 @@
+id: 6e296824-f473-4e6d-9d3b-c46302f01178
+revision: 6
+outputs:
+  default:
+    type: elasticsearch
+    hosts:
+      - 'http://173.203.133.187:9656'
+    username: '${ES_USERNAME}'
+    password: '${ES_PASSWORD}'
+    preset: balanced
+output_permissions:
+  default:
+    _elastic_agent_monitoring:
+      indices:
+        - names:
+            - logs-elastic_agent.apm_server-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-elastic_agent.apm_server-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - logs-elastic_agent.auditbeat-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-elastic_agent.auditbeat-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - logs-elastic_agent.cloud_defend-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - logs-elastic_agent.cloudbeat-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-elastic_agent.cloudbeat-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - logs-elastic_agent-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-elastic_agent.elastic_agent-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-elastic_agent.endpoint_security-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - logs-elastic_agent.endpoint_security-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - logs-elastic_agent.filebeat_input-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-elastic_agent.filebeat_input-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - logs-elastic_agent.filebeat-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-elastic_agent.filebeat-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - logs-elastic_agent.fleet_server-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-elastic_agent.fleet_server-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - logs-elastic_agent.heartbeat-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-elastic_agent.heartbeat-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - logs-elastic_agent.metricbeat-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-elastic_agent.metricbeat-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - logs-elastic_agent.osquerybeat-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-elastic_agent.osquerybeat-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - logs-elastic_agent.packetbeat-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-elastic_agent.packetbeat-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - logs-elastic_agent.pf_elastic_collector-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - logs-elastic_agent.pf_elastic_symbolizer-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - logs-elastic_agent.pf_host_agent-default
+          privileges:
+            - auto_configure
+            - create_doc
+    _elastic_agent_checks:
+      cluster:
+        - monitor
+    fa597178-c921-4add-858d-8ecc04bdc2bf:
+      indices:
+        - names:
+            - logs-system.auth-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - logs-system.syslog-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - logs-system.application-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - logs-system.security-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - logs-system.system-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-system.cpu-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-system.diskio-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-system.filesystem-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-system.fsstat-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-system.load-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-system.memory-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-system.network-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-system.process-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-system.process.summary-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-system.socket_summary-default
+          privileges:
+            - auto_configure
+            - create_doc
+        - names:
+            - metrics-system.uptime-default
+          privileges:
+            - auto_configure
+            - create_doc
+    e6d59b5e-c89f-4fe3-9879-20877ab4b907-6e296824-f473-4e6d-9d3b-c46302f01178-default:
+      indices:
+        - names:
+            - synthetics-browser-default
+          privileges:
+            - auto_configure
+            - create_doc
+            - read
+        - names:
+            - synthetics-browser.network-default
+          privileges:
+            - auto_configure
+            - create_doc
+            - read
+        - names:
+            - synthetics-browser.screenshot-default
+          privileges:
+            - auto_configure
+            - create_doc
+            - read
+    69adafe1-6c73-4b5c-80a4-b4cb03d8a9f5:
+      indices:
+        - names:
+            - synthetics-browser-default
+          privileges:
+            - auto_configure
+            - create_doc
+            - read
+        - names:
+            - synthetics-browser.network-default
+          privileges:
+            - auto_configure
+            - create_doc
+            - read
+        - names:
+            - synthetics-browser.screenshot-default
+          privileges:
+            - auto_configure
+            - create_doc
+            - read
+agent:
+  download:
+    sourceURI: 'https://artifacts.elastic.co/downloads/'
+  monitoring:
+    enabled: true
+    use_output: default
+    namespace: default
+    logs: true
+    metrics: true
+  features: {}
+  protection:
+    enabled: false
+    uninstall_token_hash: Xafh9meIEizBnLpy+hU7yUj8rSEfOFztAy+5yDtKBBY=
+    signing_key: >-
+      MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVxoPXl/AOkQHxj1e6WbiqC/uTYMSWsG5ALQ2/sOd01n03vzl4HGRuT8liXb8qkONQUrNVwNAPTqxPuC+EoIvEA==
+inputs:
+  - id: logfile-system-fa597178-c921-4add-858d-8ecc04bdc2bf
+    name: system-1
+    revision: 1
+    type: logfile
+    use_output: default
+    meta:
+      package:
+        name: system
+        version: 1.58.2
+    data_stream:
+      namespace: default
+    package_policy_id: fa597178-c921-4add-858d-8ecc04bdc2bf
+    streams:
+      - id: logfile-system.auth-fa597178-c921-4add-858d-8ecc04bdc2bf
+        data_stream:
+          dataset: system.auth
+          type: logs
+        ignore_older: 72h
+        paths:
+          - /var/log/auth.log*
+          - /var/log/secure*
+        exclude_files:
+          - \.gz$
+        multiline:
+          pattern: ^\s
+          match: after
+        tags:
+          - system-auth
+        processors:
+          - add_locale: null
+          - rename:
+              fields:
+                - from: message
+                  to: event.original
+              ignore_missing: true
+              fail_on_error: false
+          - syslog:
+              field: event.original
+              ignore_missing: true
+              ignore_failure: true
+      - id: logfile-system.syslog-fa597178-c921-4add-858d-8ecc04bdc2bf
+        data_stream:
+          dataset: system.syslog
+          type: logs
+        paths:
+          - /var/log/messages*
+          - /var/log/syslog*
+          - /var/log/system*
+        exclude_files:
+          - \.gz$
+        multiline:
+          pattern: ^\s
+          match: after
+        processors:
+          - add_locale: null
+        tags: null
+        ignore_older: 72h
+signed:
+  data: >-
+    eyJpZCI6IjZlMjk2ODI0LWY0NzMtNGU2ZC05ZDNiLWM0NjMwMmYwMTE3OCIsImFnZW50Ijp7ImZlYXR1cmVzIjp7fSwicHJvdGVjdGlvbiI6eyJlbmFibGVkIjpmYWxzZSwidW5pbnN0YWxsX3Rva2VuX2hhc2giOiJYYWZoOW1lSUVpekJuTHB5K2hVN3lVajhyU0VmT0Z6dEF5KzV5RHRLQkJZPSIsInNpZ25pbmdfa2V5IjoiTUZrd0V3WUhLb1pJemowQ0FRWUlLb1pJemowREFRY0RRZ0FFVnhvUFhsL0FPa1FIeGoxZTZXYmlxQy91VFlNU1dzRzVBTFEyL3NPZDAxbjAzdnpsNEhHUnVUOGxpWGI4cWtPTlFVck5Wd05BUFRxeFB1QytFb0l2RUE9PSJ9fSwiaW5wdXRzIjpbeyJpZCI6ImxvZ2ZpbGUtc3lzdGVtLWZhNTk3MTc4LWM5MjEtNGFkZC04NThkLThlY2MwNGJkYzJiZiIsIm5hbWUiOiJzeXN0ZW0tMSIsInJldmlzaW9uIjoxLCJ0eXBlIjoibG9nZmlsZSJ9LHsiaWQiOiJ3aW5sb2ctc3lzdGVtLWZhNTk3MTc4LWM5MjEtNGFkZC04NThkLThlY2MwNGJkYzJiZiIsIm5hbWUiOiJzeXN0ZW0tMSIsInJldmlzaW9uIjoxLCJ0eXBlIjoid2lubG9nIn0seyJpZCI6InN5c3RlbS9tZXRyaWNzLXN5c3RlbS1mYTU5NzE3OC1jOTIxLTRhZGQtODU4ZC04ZWNjMDRiZGMyYmYiLCJuYW1lIjoic3lzdGVtLTEiLCJyZXZpc2lvbiI6MSwidHlwZSI6InN5c3RlbS9tZXRyaWNzIn0seyJpZCI6InN5bnRoZXRpY3MvYnJvd3Nlci1zeW50aGV0aWNzLWU2ZDU5YjVlLWM4OWYtNGZlMy05ODc5LTIwODc3YWI0YjkwNy02ZTI5NjgyNC1mNDczLTRlNmQtOWQzYi1jNDYzMDJmMDExNzgtZGVmYXVsdCIsIm5hbWUiOiJodHRwczovL3d3dy5nb29nbGUuY29tLXRlc3QtZGVmYXVsdCIsInJldmlzaW9uIjoxLCJ0eXBlIjoic3ludGhldGljcy9icm93c2VyIn0seyJpZCI6InN5bnRoZXRpY3MvYnJvd3Nlci1zeW50aGV0aWNzLTY5YWRhZmUxLTZjNzMtNGI1Yy04MGE0LWI0Y2IwM2Q4YTlmNSIsIm5hbWUiOiJCUk9XU0VSX1NZTlRIRVRJQ1NfVEVTVF9OT1dfUlVOIiwicmV2aXNpb24iOjEsInR5cGUiOiJzeW50aGV0aWNzL2Jyb3dzZXIifV19
+  signature: >-
+    MEUCIQDeXvS0VwohMJmgh0GN4Zk89ruDjDiV7BjuDP/81+i9ggIgKlCPseK8KRFTbfmub524rtqujgh6ftAuktgRhr139ww=
+secret_references: []

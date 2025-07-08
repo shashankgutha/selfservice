@@ -1,0 +1,89 @@
+- id: synthetics/browser-synthetics-69adafe1-6c73-4b5c-80a4-b4cb03d8a9f5
+  name: BROWSER_SYNTHETICS_TEST_NOW_RUN
+  revision: 1
+  type: synthetics/browser
+  use_output: default
+  meta:
+    package:
+      name: synthetics
+      version: 1.3.0
+  data_stream:
+    namespace: default
+  package_policy_id: 69adafe1-6c73-4b5c-80a4-b4cb03d8a9f5
+  streams:
+    - id: e60cbf11-d5b4-4e13-8aa6-a1eed3f25123
+      name: 'https://www.google.com'
+      type: browser
+      enabled: true
+      data_stream:
+        dataset: browser
+        type: synthetics
+        elasticsearch:
+          privileges:
+            indices:
+              - auto_configure
+              - create_doc
+              - read
+      __ui:
+        script_source:
+          is_generated_script: false
+          file_name: ''
+      origin: ui
+      run_from.id: 6e296824-f473-4e6d-9d3b-c46302f01178
+      run_from.geo.name: test
+      schedule: '@every 43800m'
+      timeout: null
+      throttling:
+        download: 5
+        upload: 3
+        latency: 20
+      source.inline.script: |-
+        step('Go to https://www.google.com', async () => {
+          await page.goto('https://www.google.com');
+        });
+      screenshots: 'on'
+      max_attempts: 2
+      processors:
+        - add_fields:
+            fields:
+              meta:
+                space_id: default
+              monitor.fleet_managed: true
+              config_id: e6d59b5e-c89f-4fe3-9879-20877ab4b907
+              test_run_id: e60cbf11-d5b4-4e13-8aa6-a1eed3f25123
+              monitor.id: e6d59b5e-c89f-4fe3-9879-20877ab4b907
+              monitor.project.name: ''
+              monitor.project.id: ''
+            target: ''
+    - id: >-
+        synthetics/browser-browser.network-69adafe1-6c73-4b5c-80a4-b4cb03d8a9f5
+      data_stream:
+        dataset: browser.network
+        type: synthetics
+        elasticsearch:
+          privileges:
+            indices:
+              - auto_configure
+              - create_doc
+              - read
+      processors:
+        - add_fields:
+            target: ''
+            fields:
+              monitor.fleet_managed: true
+    - id: >-
+        synthetics/browser-browser.screenshot-69adafe1-6c73-4b5c-80a4-b4cb03d8a9f5
+      data_stream:
+        dataset: browser.screenshot
+        type: synthetics
+        elasticsearch:
+          privileges:
+            indices:
+              - auto_configure
+              - create_doc
+              - read
+      processors:
+        - add_fields:
+            target: ''
+            fields:
+              monitor.fleet_managed: true
