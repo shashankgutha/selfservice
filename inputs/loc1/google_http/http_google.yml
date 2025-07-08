@@ -11,7 +11,7 @@
     namespace: default
   package_policy_id: 69adafe1-6c73-4b5c-80a4-b4cb03d8a9f5
   streams:
-    - id: e60cbf11-d5b4-4e13-8aa6-a1eed5f351234
+    - id: e60cbf11-d5b4-4e13-8aa6-a1eed5f451234
       name: 'https://www.google.com'
       type: browser
       enabled: true

@@ -35,8 +35,19 @@ jobs:
           # Get the base branch commit
           git fetch origin ${{ github.base_ref }}
           
-          # Find changed files matching our pattern
-          changed_files=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '^inputs/.*/.*\.yml$' | grep -v 'elastic-agent\.yml$' || true)
+          echo "=== Debug: All changed files ==="
+          git diff --name-only origin/${{ github.base_ref }}...HEAD
+          
+          echo "=== Debug: Files matching inputs pattern ==="
+          git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '^inputs/' || echo "No files match inputs/ pattern"
+          
+          echo "=== Debug: YAML files in inputs ==="
+          git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '^inputs/.*\.yml$' || echo "No YAML files in inputs"
+          
+          echo "=== Debug: Final filtered files ==="
+          # Find changed files matching our pattern - more flexible regex
+          changed_files=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '^inputs/.*\.yml$' | grep -v 'elastic-agent\.yml$' || true)
+          echo "Filtered files: '$changed_files'"
           
           if [ -n "$changed_files" ]; then
             echo "any_changed=true" >> $GITHUB_OUTPUT
