@@ -96,7 +96,7 @@ inputs:
           - read
       type: synthetics
     enabled: true
-    id: e60cbf11-d5b4-4e13-8aa6-a1eea3f25123
+    id: e60cbf11-d5b4-4e13-8aa6-a1fea3f25123
     max_attempts: 2
     name: https://www.google.com
     origin: ui
