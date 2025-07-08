@@ -1,6 +1,11 @@
 import os
 import sys
 import yaml
+from yaml import SafeDumper
+
+class CustomDumper(SafeDumper):
+    def increase_indent(self, flow=False, indentless=False):
+        return super(CustomDumper, self).increase_indent(flow, False)
 
 def get_changed_files():
     """
@@ -69,7 +74,7 @@ def update_elastic_agent_config(input_file):
             print(f"Added new input with ID: {new_input_id}")
 
     with open(main_config_path, 'w') as f:
-        yaml.dump(main_config, f, default_flow_style=False)
+        yaml.dump(main_config, f, Dumper=CustomDumper, default_flow_style=False, indent=2, sort_keys=False, allow_unicode=True)
 
     validate_yaml(main_config_path)
     print(f"Successfully updated {main_config_path} with {input_file}")
