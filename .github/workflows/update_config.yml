@@ -2,10 +2,10 @@ name: Update Elastic Agent Config
 
 on:
   pull_request:
+    branches:
+      - main
     paths:
-      - 'inputs/**/**.yml'
-    paths-ignore:
-      - '**/elastic-agent.yml'
+      - 'inputs/*/*/**.yml'
 
 jobs:
   update-config:

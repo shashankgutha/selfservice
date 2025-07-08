@@ -4,7 +4,7 @@ This document outlines the architecture of the GitHub Actions workflow designed 
 
 ## Plan for the Git Workflow
 
-1.  **Workflow Trigger**: The workflow is triggered on pull requests with changes in the `inputs/` directory, but it ignores changes to `elastic-agent.yml` files.
+1.  **Workflow Trigger**: The workflow is triggered only on pull requests targeting the main branch that contain changes to `.yml` files located in subdirectories within the `inputs/` directory (e.g., `inputs/loc1/google_http/http_google.yml`). This excludes the `elastic-agent.yml` files located directly within `inputs/loc1/` or `inputs/loc2/`. The workflow will not trigger on direct commits to the main branch.
 2.  **Identify Changed Files**: The workflow identifies all `.yml` files added or modified in the pull request.
 3.  **Process Each Change**: For each changed input file, the workflow:
     *   **Validate Input File**: It first validates the YAML syntax of the changed input file. If invalid, the workflow will fail and report an error.
