@@ -22,9 +22,17 @@ def validate_yaml(file_path):
     """
     try:
         with open(file_path, 'r') as f:
-            yaml.safe_load(f)
-    except (yaml.YAMLError, FileNotFoundError) as e:
-        print(f"Error validating {file_path}: {e}")
+            content = yaml.safe_load(f)
+        print(f"Successfully validated YAML: {file_path}")
+        return content
+    except yaml.YAMLError as e:
+        print(f"YAML syntax error in {file_path}: {e}")
+        sys.exit(1)
+    except FileNotFoundError as e:
+        print(f"File not found: {file_path}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Unexpected error validating {file_path}: {e}")
         sys.exit(1)
 
 def update_elastic_agent_config(input_file):
@@ -40,13 +48,15 @@ def update_elastic_agent_config(input_file):
 
     validate_yaml(main_config_path)
 
+    print(f"Reading input file: {input_file}")
     with open(input_file, 'r') as f:
         new_inputs = yaml.safe_load(f)
 
+    print(f"Reading main config: {main_config_path}")
     with open(main_config_path, 'r') as f:
         main_config = yaml.safe_load(f)
 
-    if 'inputs' not in main_config:
+    if 'inputs' not in main_config or main_config['inputs'] is None:
         main_config['inputs'] = []
 
     # Process each new input
@@ -92,9 +102,13 @@ if __name__ == "__main__":
     for file_path in changed_files:
         if file_path.endswith('.yml') and 'inputs' in file_path and 'elastic-agent.yml' not in file_path:
             print(f"Processing input file: {file_path}")
-            validate_yaml(file_path)
-            update_elastic_agent_config(file_path)
-            processed_files += 1
+            try:
+                validate_yaml(file_path)
+                update_elastic_agent_config(file_path)
+                processed_files += 1
+            except Exception as e:
+                print(f"Error processing {file_path}: {e}")
+                sys.exit(1)
         else:
             print(f"Skipping file (not an input file): {file_path}")
     
