@@ -45,7 +45,11 @@ jobs:
         id: update_script
         if: steps.changed-files.outputs.any_changed == 'true'
         run: |
-          python .github/scripts/update_elastic_agent.py ${{ steps.changed-files.outputs.all_changed_files }}
+          output=$(python .github/scripts/update_elastic_agent.py ${{ steps.changed-files.outputs.all_changed_files }} 2>&1)
+          echo "$output"
+          echo "script_output<<EOF" >> $GITHUB_OUTPUT
+          echo "$output" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
         continue-on-error: true
 
       - name: Skip update script
@@ -74,7 +78,7 @@ jobs:
             
             **Details:**
             \`\`\`
-            ${{ steps.update_script.outputs.stdout }}
+            ${{ steps.update_script.outputs.script_output }}
             \`\`\`
             `;
             github.rest.issues.createComment({
@@ -96,7 +100,7 @@ jobs:
             
             **Error Details:**
             \`\`\`
-            ${{ steps.update_script.outputs.stderr }}
+            ${{ steps.update_script.outputs.script_output }}
             \`\`\`
             `;
             github.rest.issues.createComment({
