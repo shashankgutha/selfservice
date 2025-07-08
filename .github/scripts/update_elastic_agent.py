@@ -8,7 +8,7 @@ def get_changed_files():
     """
     if len(sys.argv) < 2:
         print("No changed files provided.")
-        sys.exit(0)
+        return []
     return sys.argv[1:]
 
 def validate_yaml(file_path):
@@ -36,7 +36,7 @@ def update_elastic_agent_config(input_file):
     validate_yaml(main_config_path)
 
     with open(input_file, 'r') as f:
-        new_input = yaml.safe_load(f)
+        new_inputs = yaml.safe_load(f)
 
     with open(main_config_path, 'r') as f:
         main_config = yaml.safe_load(f)
@@ -44,7 +44,29 @@ def update_elastic_agent_config(input_file):
     if 'inputs' not in main_config:
         main_config['inputs'] = []
 
-    main_config['inputs'].extend(new_input)
+    # Process each new input
+    for new_input in new_inputs:
+        if 'id' not in new_input:
+            print(f"Warning: Input without ID found in {input_file}, skipping")
+            continue
+            
+        new_input_id = new_input['id']
+        
+        # Check if input with same ID already exists
+        existing_input_index = None
+        for i, existing_input in enumerate(main_config['inputs']):
+            if existing_input.get('id') == new_input_id:
+                existing_input_index = i
+                break
+        
+        if existing_input_index is not None:
+            # Update existing input
+            main_config['inputs'][existing_input_index] = new_input
+            print(f"Updated existing input with ID: {new_input_id}")
+        else:
+            # Add new input
+            main_config['inputs'].append(new_input)
+            print(f"Added new input with ID: {new_input_id}")
 
     with open(main_config_path, 'w') as f:
         yaml.dump(main_config, f, default_flow_style=False)
@@ -54,7 +76,24 @@ def update_elastic_agent_config(input_file):
 
 if __name__ == "__main__":
     changed_files = get_changed_files()
+    
+    if not changed_files:
+        print("No files to process.")
+        sys.exit(0)
+    
+    print(f"Processing {len(changed_files)} changed files: {changed_files}")
+    
+    processed_files = 0
     for file_path in changed_files:
         if file_path.endswith('.yml') and 'inputs' in file_path and 'elastic-agent.yml' not in file_path:
+            print(f"Processing input file: {file_path}")
             validate_yaml(file_path)
             update_elastic_agent_config(file_path)
+            processed_files += 1
+        else:
+            print(f"Skipping file (not an input file): {file_path}")
+    
+    if processed_files == 0:
+        print("No valid input files found to process.")
+    else:
+        print(f"Successfully processed {processed_files} input files.")

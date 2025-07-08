@@ -29,13 +29,24 @@ jobs:
         uses: tj-actions/changed-files@v41
         with:
           files: |
-            inputs/**.yml
+            inputs/*/*/**.yml
+
+      - name: Debug changed files
+        run: |
+          echo "Changed files: ${{ steps.changed-files.outputs.all_changed_files }}"
+          echo "Files changed: ${{ steps.changed-files.outputs.any_changed }}"
 
       - name: Run update script
         id: update_script
+        if: steps.changed-files.outputs.any_changed == 'true'
         run: |
           python .github/scripts/update_elastic_agent.py ${{ steps.changed-files.outputs.all_changed_files }}
         continue-on-error: true
+
+      - name: Skip update script
+        if: steps.changed-files.outputs.any_changed != 'true'
+        run: |
+          echo "No relevant files changed, skipping update script"
 
       - name: Commit files
         if: steps.update_script.outcome == 'success'
@@ -46,17 +57,41 @@ jobs:
           git commit -m "Update elastic-agent.yml from changed inputs" || echo "No changes to commit"
           git push
 
-      - name: Post PR comment
+      - name: Post success PR comment
+        if: steps.update_script.outcome == 'success'
         uses: actions/github-script@v6
         with:
           script: |
             const output = `
-            #### ✅ Elastic Agent Config Update
-            **Status:** ${{ steps.update_script.outcome }}
+            #### ✅ Elastic Agent Config Update - Success
+            
+            The elastic-agent.yml files have been successfully updated with the new input configurations.
             
             **Details:**
             \`\`\`
             ${{ steps.update_script.outputs.stdout }}
+            \`\`\`
+            `;
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: output
+            });
+
+      - name: Post failure PR comment
+        if: steps.update_script.outcome == 'failure'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const output = `
+            #### ❌ Elastic Agent Config Update - Failed
+            
+            There was an error updating the elastic-agent.yml files.
+            
+            **Error Details:**
+            \`\`\`
+            ${{ steps.update_script.outputs.stderr }}
             \`\`\`
             `;
             github.rest.issues.createComment({
