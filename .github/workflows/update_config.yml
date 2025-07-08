@@ -16,23 +16,10 @@ jobs:
   update-config:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout PR branch
+      - name: Checkout code
         uses: actions/checkout@v3
         with:
           ref: ${{ github.head_ref }}
-          
-      - name: Checkout workflow from main
-        uses: actions/checkout@v3
-        with:
-          ref: main
-          path: main-workflow
-          sparse-checkout: |
-            .github/
-          sparse-checkout-cone-mode: false
-          
-      - name: Copy workflow files from main
-        run: |
-          cp -r main-workflow/.github/scripts .github/
 
       - name: Set up Python
         uses: actions/setup-python@v4
