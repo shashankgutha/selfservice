@@ -46,7 +46,7 @@ def update_elastic_agent_config(input_file):
     with open(main_config_path, 'r') as f:
         main_config = yaml.safe_load(f)
 
-    if 'inputs' not in main_config:
+    if 'inputs' not in main_config or main_config['inputs'] is None:
         main_config['inputs'] = []
 
     # Process each new input
