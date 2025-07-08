@@ -10,7 +10,7 @@ This document outlines the architecture of the GitHub Actions workflow designed 
     *   **Validate Input File**: It first validates the YAML syntax of the changed input file. If invalid, the workflow will fail and report an error.
     *   **Determine Location**: It will find the parent directory (e.g., `loc1`, `loc2`).
     *   **Verify Main File**: It will check if `elastic-agent.yml` exists in that location. If not, it will fail.
-    *   **Append Content**: The content of the valid input file will be appended to the `inputs:` section of the corresponding `elastic-agent.yml`.
+    *   **Update/Append Content**: The script will check if an input with the same ID already exists in the `elastic-agent.yml` file. If it exists, it will update the existing input; if not, it will append the new input to the `inputs:` section.
 4.  **Validate Main YAML**: After updating, the workflow will validate the `elastic-agent.yml` file's syntax.
 5.  **Commit Changes**: If validation passes, the changes will be committed to the pull request branch.
 6.  **Post PR Comment**: The workflow will post a comment on the pull request.
