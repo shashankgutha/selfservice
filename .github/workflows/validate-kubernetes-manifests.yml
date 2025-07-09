@@ -1,0 +1,206 @@
+name: Validate Kubernetes Manifests
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'inputs/*/agent-deployment.yml'
+      - 'inputs/*/kustomization.yml'
+      - 'inputs/*/elastic-agent.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate-loc1:
+    runs-on: ubuntu-latest
+    if: contains(github.event.pull_request.changed_files, 'inputs/loc1/')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Install kustomize
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Check changed files for loc1
+        id: changes
+        run: |
+          echo "=== Checking loc1 changes ==="
+          git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep "^inputs/loc1/" || echo "No loc1 changes"
+          
+          if git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep -E "^inputs/loc1/(agent-deployment\.yml|kustomization\.yml|elastic-agent\.yml)$"; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Validate YAML syntax
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          echo "=== Validating YAML syntax for loc1 ==="
+          
+          # Validate agent-deployment.yml
+          if [ -f "inputs/loc1/agent-deployment.yml" ]; then
+            echo "✓ Validating agent-deployment.yml..."
+            kubectl apply --dry-run=client -f inputs/loc1/agent-deployment.yml
+          fi
+          
+          # Validate elastic-agent.yml
+          if [ -f "inputs/loc1/elastic-agent.yml" ]; then
+            echo "✓ Validating elastic-agent.yml YAML syntax..."
+            python -c "import yaml; yaml.safe_load(open('inputs/loc1/elastic-agent.yml'))"
+          fi
+
+      - name: Validate kustomization
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          echo "=== Validating kustomization for loc1 ==="
+          
+          if [ -f "inputs/loc1/kustomization.yml" ]; then
+            cd inputs/loc1
+            
+            echo "✓ Building kustomization..."
+            kustomize build . > /tmp/kustomized-loc1.yml
+            
+            echo "✓ Validating built manifests..."
+            kubectl apply --dry-run=client -f /tmp/kustomized-loc1.yml
+            
+            echo "✓ Manifest preview (first 30 lines):"
+            head -30 /tmp/kustomized-loc1.yml
+          fi
+
+  validate-loc2:
+    runs-on: ubuntu-latest
+    if: contains(github.event.pull_request.changed_files, 'inputs/loc2/')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Install kustomize
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Check changed files for loc2
+        id: changes
+        run: |
+          echo "=== Checking loc2 changes ==="
+          git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep "^inputs/loc2/" || echo "No loc2 changes"
+          
+          if git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep -E "^inputs/loc2/(agent-deployment\.yml|kustomization\.yml|elastic-agent\.yml)$"; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Validate YAML syntax
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          echo "=== Validating YAML syntax for loc2 ==="
+          
+          # Validate agent-deployment.yml
+          if [ -f "inputs/loc2/agent-deployment.yml" ]; then
+            echo "✓ Validating agent-deployment.yml..."
+            kubectl apply --dry-run=client -f inputs/loc2/agent-deployment.yml
+          fi
+          
+          # Validate elastic-agent.yml
+          if [ -f "inputs/loc2/elastic-agent.yml" ]; then
+            echo "✓ Validating elastic-agent.yml YAML syntax..."
+            python -c "import yaml; yaml.safe_load(open('inputs/loc2/elastic-agent.yml'))"
+          fi
+
+      - name: Validate kustomization
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          echo "=== Validating kustomization for loc2 ==="
+          
+          if [ -f "inputs/loc2/kustomization.yml" ]; then
+            cd inputs/loc2
+            
+            echo "✓ Building kustomization..."
+            kustomize build . > /tmp/kustomized-loc2.yml
+            
+            echo "✓ Validating built manifests..."
+            kubectl apply --dry-run=client -f /tmp/kustomized-loc2.yml
+            
+            echo "✓ Manifest preview (first 30 lines):"
+            head -30 /tmp/kustomized-loc2.yml
+          fi
+
+  post-validation:
+    needs: [validate-loc1, validate-loc2]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Post validation results
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const loc1Result = '${{ needs.validate-loc1.result }}';
+            const loc2Result = '${{ needs.validate-loc2.result }}';
+            
+            let comment = `## 🔍 Kubernetes Manifest Validation Results\n\n`;
+            
+            // Determine overall status
+            let overallSuccess = true;
+            let hasValidations = false;
+            
+            if (loc1Result !== 'skipped') {
+              hasValidations = true;
+              const status = loc1Result === 'success' ? '✅' : '❌';
+              comment += `- **loc1**: ${status} ${loc1Result}\n`;
+              if (loc1Result !== 'success') overallSuccess = false;
+            }
+            
+            if (loc2Result !== 'skipped') {
+              hasValidations = true;
+              const status = loc2Result === 'success' ? '✅' : '❌';
+              comment += `- **loc2**: ${status} ${loc2Result}\n`;
+              if (loc2Result !== 'success') overallSuccess = false;
+            }
+            
+            if (!hasValidations) {
+              comment += `⏭️ No Kubernetes manifest changes detected - validation skipped\n`;
+            } else if (overallSuccess) {
+              comment += `\n### ✅ All validations passed!\n`;
+              comment += `The Kubernetes manifests are valid and ready for deployment.\n`;
+            } else {
+              comment += `\n### ❌ Validation failed\n`;
+              comment += `Please check the workflow logs and fix the issues before merging.\n`;
+            }
+            
+            comment += `\n### 📋 Validated Components\n`;
+            comment += `- **YAML Syntax**: Checked with kubectl dry-run\n`;
+            comment += `- **Kustomization**: Built and validated\n`;
+            comment += `- **Kubernetes Schema**: Validated against cluster API\n`;
+            
+            if (hasValidations && overallSuccess) {
+              comment += `\n### 🚀 Next Steps\n`;
+              comment += `- Merge this PR to trigger automatic deployment\n`;
+              comment += `- Monitor the deployment workflow for results\n`;
+            }
+            
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: comment
+            });

@@ -1,0 +1,405 @@
+name: Deploy to Kubernetes
+
+on:
+  workflow_run:
+    workflows: ["Update Elastic Agent Config"]
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  contents: read
+  actions: read
+  deployments: write
+
+env:
+  VAULT_URL: "https://or.vault.comcast.com"
+  VAULT_ROLE: "efv-observability_ci-owners"
+  VAULT_JWT_PATH: "jwt/ghactions"
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      loc1_changed: ${{ steps.detect.outputs.loc1_changed }}
+      loc2_changed: ${{ steps.detect.outputs.loc2_changed }}
+      deploy_needed: ${{ steps.detect.outputs.deploy_needed }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Detect location changes
+        id: detect
+        run: |
+          echo "=== Detecting Kubernetes manifest changes ==="
+          
+          # Get the commit SHA from the triggering workflow
+          COMMIT_SHA="${{ github.event.workflow_run.head_sha }}"
+          echo "Checking changes for commit: $COMMIT_SHA"
+          
+          # Get changed files from the last commit
+          changed_files=$(git diff --name-only $COMMIT_SHA~1..$COMMIT_SHA)
+          echo "Changed files:"
+          echo "$changed_files"
+          
+          # Check for loc1 changes
+          loc1_k8s_changed=false
+          if echo "$changed_files" | grep -E "^inputs/loc1/(agent-deployment\.yml|kustomization\.yml|elastic-agent\.yml)$"; then
+            loc1_k8s_changed=true
+            echo "✅ loc1 has Kubernetes-related changes"
+          fi
+          
+          # Check for loc2 changes
+          loc2_k8s_changed=false
+          if echo "$changed_files" | grep -E "^inputs/loc2/(agent-deployment\.yml|kustomization\.yml|elastic-agent\.yml)$"; then
+            loc2_k8s_changed=true
+            echo "✅ loc2 has Kubernetes-related changes"
+          fi
+          
+          # Set outputs
+          echo "loc1_changed=$loc1_k8s_changed" >> $GITHUB_OUTPUT
+          echo "loc2_changed=$loc2_k8s_changed" >> $GITHUB_OUTPUT
+          
+          if [[ "$loc1_k8s_changed" == "true" || "$loc2_k8s_changed" == "true" ]]; then
+            echo "deploy_needed=true" >> $GITHUB_OUTPUT
+            echo "🚀 Kubernetes deployment needed"
+          else
+            echo "deploy_needed=false" >> $GITHUB_OUTPUT
+            echo "❌ No Kubernetes deployment needed"
+          fi
+
+  deploy-loc1:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.loc1_changed == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: kubernetes-loc1
+      url: https://kubernetes-loc1.example.com
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Create deployment status
+        uses: actions/github-script@v6
+        id: deployment
+        with:
+          script: |
+            const deployment = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: '${{ github.event.workflow_run.head_sha }}',
+              environment: 'kubernetes-loc1',
+              description: 'Deploying Elastic Agent to loc1',
+              auto_merge: false,
+              required_contexts: []
+            });
+            
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: deployment.data.id,
+              state: 'in_progress',
+              description: 'Starting deployment to loc1'
+            });
+            
+            return deployment.data.id;
+
+      - name: Retrieve Kubeconfig from Vault
+        id: vault-k8sconfig
+        uses: hashicorp/vault-action@v2
+        with:
+          method: jwt
+          path: ${{ env.VAULT_JWT_PATH }}
+          url: ${{ env.VAULT_URL }}
+          role: ${{ env.VAULT_ROLE }}
+          secrets: |
+            kv2/data/efv-observability/automation/kubeconfig/loc1 config | KUBECONFIG_B64
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ steps.vault-k8sconfig.outputs.KUBECONFIG_B64 }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+          kubectl cluster-info
+
+      - name: Set up tools
+        run: |
+          # Install kustomize
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Prepare namespace
+        run: |
+          NAMESPACE="elastic-agents-loc1"
+          kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+          echo "NAMESPACE=$NAMESPACE" >> $GITHUB_ENV
+
+      - name: Validate and deploy
+        run: |
+          cd inputs/loc1
+          
+          # Build kustomization
+          echo "Building kustomization..."
+          kustomize build . > /tmp/deployment-loc1.yml
+          
+          # Dry-run validation
+          echo "Performing dry-run..."
+          kubectl apply --dry-run=server -f /tmp/deployment-loc1.yml -n $NAMESPACE
+          
+          # Apply deployment
+          echo "Applying deployment..."
+          kubectl apply -f /tmp/deployment-loc1.yml -n $NAMESPACE
+          
+          # Wait for deployment
+          echo "Waiting for deployment..."
+          kubectl rollout status deployment/elastic-agent -n $NAMESPACE --timeout=300s
+          
+          # Verify deployment
+          echo "Verifying deployment..."
+          kubectl get pods -n $NAMESPACE -l app=elastic-agent
+          kubectl get configmap elastic-agent-config -n $NAMESPACE
+
+      - name: Update deployment status - Success
+        if: success()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.deployment.outputs.result }},
+              state: 'success',
+              description: 'Successfully deployed to loc1'
+            });
+
+      - name: Update deployment status - Failure
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.deployment.outputs.result }},
+              state: 'failure',
+              description: 'Failed to deploy to loc1'
+            });
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Rolling back deployment..."
+          kubectl rollout undo deployment/elastic-agent -n $NAMESPACE
+          kubectl rollout status deployment/elastic-agent -n $NAMESPACE --timeout=300s
+
+  deploy-loc2:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.loc2_changed == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: kubernetes-loc2
+      url: https://kubernetes-loc2.example.com
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Create deployment status
+        uses: actions/github-script@v6
+        id: deployment
+        with:
+          script: |
+            const deployment = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: '${{ github.event.workflow_run.head_sha }}',
+              environment: 'kubernetes-loc2',
+              description: 'Deploying Elastic Agent to loc2',
+              auto_merge: false,
+              required_contexts: []
+            });
+            
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: deployment.data.id,
+              state: 'in_progress',
+              description: 'Starting deployment to loc2'
+            });
+            
+            return deployment.data.id;
+
+      - name: Retrieve Kubeconfig from Vault
+        id: vault-k8sconfig
+        uses: hashicorp/vault-action@v2
+        with:
+          method: jwt
+          path: ${{ env.VAULT_JWT_PATH }}
+          url: ${{ env.VAULT_URL }}
+          role: ${{ env.VAULT_ROLE }}
+          secrets: |
+            kv2/data/efv-observability/automation/kubeconfig/loc2 config | KUBECONFIG_B64
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ steps.vault-k8sconfig.outputs.KUBECONFIG_B64 }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+          kubectl cluster-info
+
+      - name: Set up tools
+        run: |
+          # Install kustomize
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Prepare namespace
+        run: |
+          NAMESPACE="elastic-agents-loc2"
+          kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+          echo "NAMESPACE=$NAMESPACE" >> $GITHUB_ENV
+
+      - name: Validate and deploy
+        run: |
+          cd inputs/loc2
+          
+          # Build kustomization
+          echo "Building kustomization..."
+          kustomize build . > /tmp/deployment-loc2.yml
+          
+          # Dry-run validation
+          echo "Performing dry-run..."
+          kubectl apply --dry-run=server -f /tmp/deployment-loc2.yml -n $NAMESPACE
+          
+          # Apply deployment
+          echo "Applying deployment..."
+          kubectl apply -f /tmp/deployment-loc2.yml -n $NAMESPACE
+          
+          # Wait for deployment
+          echo "Waiting for deployment..."
+          kubectl rollout status deployment/elastic-agent -n $NAMESPACE --timeout=300s
+          
+          # Verify deployment
+          echo "Verifying deployment..."
+          kubectl get pods -n $NAMESPACE -l app=elastic-agent
+          kubectl get configmap elastic-agent-config -n $NAMESPACE
+
+      - name: Update deployment status - Success
+        if: success()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.deployment.outputs.result }},
+              state: 'success',
+              description: 'Successfully deployed to loc2'
+            });
+
+      - name: Update deployment status - Failure
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.deployment.outputs.result }},
+              state: 'failure',
+              description: 'Failed to deploy to loc2'
+            });
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Rolling back deployment..."
+          kubectl rollout undo deployment/elastic-agent -n $NAMESPACE
+          kubectl rollout status deployment/elastic-agent -n $NAMESPACE --timeout=300s
+
+  post-deployment:
+    needs: [detect-changes, deploy-loc1, deploy-loc2]
+    runs-on: ubuntu-latest
+    if: always() && needs.detect-changes.outputs.deploy_needed == 'true'
+    
+    steps:
+      - name: Post deployment summary
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const loc1Changed = '${{ needs.detect-changes.outputs.loc1_changed }}' === 'true';
+            const loc2Changed = '${{ needs.detect-changes.outputs.loc2_changed }}' === 'true';
+            const loc1Result = '${{ needs.deploy-loc1.result }}';
+            const loc2Result = '${{ needs.deploy-loc2.result }}';
+            
+            let comment = `## 🚀 Kubernetes Deployment Summary\n\n`;
+            comment += `**Triggered by**: ${{ github.event.workflow_run.name }}\n`;
+            comment += `**Commit**: ${{ github.event.workflow_run.head_sha }}\n\n`;
+            
+            comment += `### Deployment Results\n\n`;
+            
+            if (loc1Changed) {
+              const status = loc1Result === 'success' ? '✅' : '❌';
+              comment += `- **loc1**: ${status} ${loc1Result}\n`;
+            }
+            
+            if (loc2Changed) {
+              const status = loc2Result === 'success' ? '✅' : '❌';
+              comment += `- **loc2**: ${status} ${loc2Result}\n`;
+            }
+            
+            comment += `\n### 🔍 Verification Commands\n`;
+            comment += `\`\`\`bash\n`;
+            
+            if (loc1Changed) {
+              comment += `# Check loc1 deployment\n`;
+              comment += `kubectl get pods -n elastic-agents-loc1 -l app=elastic-agent\n`;
+              comment += `kubectl logs -n elastic-agents-loc1 -l app=elastic-agent\n\n`;
+            }
+            
+            if (loc2Changed) {
+              comment += `# Check loc2 deployment\n`;
+              comment += `kubectl get pods -n elastic-agents-loc2 -l app=elastic-agent\n`;
+              comment += `kubectl logs -n elastic-agents-loc2 -l app=elastic-agent\n\n`;
+            }
+            
+            comment += `\`\`\`\n`;
+            
+            // Find the original PR that triggered this
+            const workflowRun = await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: ${{ github.event.workflow_run.id }}
+            });
+            
+            if (workflowRun.data.pull_requests && workflowRun.data.pull_requests.length > 0) {
+              const prNumber = workflowRun.data.pull_requests[0].number;
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: comment
+              });
+            }
+
+  skip-deployment:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.deploy_needed == 'false'
+    
+    steps:
+      - name: Skip deployment message
+        run: |
+          echo "⏭️ No Kubernetes deployment needed"
+          echo "No changes detected in Kubernetes manifest files"
