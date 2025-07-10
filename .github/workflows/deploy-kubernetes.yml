@@ -1,12 +1,29 @@
 name: Deploy to Kubernetes
 
 on:
-  workflow_run:
-    workflows: ["Update Elastic Agent Config"]
-    types:
-      - completed
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+        - both
+        - loc1
+        - loc2
+      force_deploy:
+        description: 'Force deployment even if no changes detected'
+        required: false
+        default: false
+        type: boolean
+  push:
     branches:
       - main
+    paths:
+      - 'inputs/*/agent-deployment.yml'
+      - 'inputs/*/kustomization.yml'
+      - 'inputs/*/elastic-agent.yml'
 
 permissions:
   contents: read
@@ -21,7 +38,6 @@ env:
 jobs:
   detect-changes:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     outputs:
       loc1_changed: ${{ steps.detect.outputs.loc1_changed }}
       loc2_changed: ${{ steps.detect.outputs.loc2_changed }}
@@ -36,41 +52,68 @@ jobs:
       - name: Detect location changes
         id: detect
         run: |
-          echo "=== Detecting Kubernetes manifest changes ==="
+          echo "=== Detecting deployment requirements ==="
+          echo "Trigger event: ${{ github.event_name }}"
           
-          # Get the commit SHA from the triggering workflow
-          COMMIT_SHA="${{ github.event.workflow_run.head_sha }}"
-          echo "Checking changes for commit: $COMMIT_SHA"
-          
-          # Get changed files from the last commit
-          changed_files=$(git diff --name-only $COMMIT_SHA~1..$COMMIT_SHA)
-          echo "Changed files:"
-          echo "$changed_files"
-          
-          # Check for loc1 changes
-          loc1_k8s_changed=false
-          if echo "$changed_files" | grep -E "^inputs/loc1/(agent-deployment\.yml|kustomization\.yml|elastic-agent\.yml)$"; then
-            loc1_k8s_changed=true
-            echo "✅ loc1 has Kubernetes-related changes"
-          fi
-          
-          # Check for loc2 changes
-          loc2_k8s_changed=false
-          if echo "$changed_files" | grep -E "^inputs/loc2/(agent-deployment\.yml|kustomization\.yml|elastic-agent\.yml)$"; then
-            loc2_k8s_changed=true
-            echo "✅ loc2 has Kubernetes-related changes"
-          fi
-          
-          # Set outputs
-          echo "loc1_changed=$loc1_k8s_changed" >> $GITHUB_OUTPUT
-          echo "loc2_changed=$loc2_k8s_changed" >> $GITHUB_OUTPUT
-          
-          if [[ "$loc1_k8s_changed" == "true" || "$loc2_k8s_changed" == "true" ]]; then
+          # Handle manual workflow dispatch
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            environment="${{ github.event.inputs.environment }}"
+            force_deploy="${{ github.event.inputs.force_deploy }}"
+            
+            echo "Manual deployment requested for: $environment"
+            echo "Force deploy: $force_deploy"
+            
+            case "$environment" in
+              "loc1")
+                echo "loc1_changed=true" >> $GITHUB_OUTPUT
+                echo "loc2_changed=false" >> $GITHUB_OUTPUT
+                ;;
+              "loc2")
+                echo "loc1_changed=false" >> $GITHUB_OUTPUT
+                echo "loc2_changed=true" >> $GITHUB_OUTPUT
+                ;;
+              "both")
+                echo "loc1_changed=true" >> $GITHUB_OUTPUT
+                echo "loc2_changed=true" >> $GITHUB_OUTPUT
+                ;;
+            esac
             echo "deploy_needed=true" >> $GITHUB_OUTPUT
-            echo "🚀 Kubernetes deployment needed"
-          else
-            echo "deploy_needed=false" >> $GITHUB_OUTPUT
-            echo "❌ No Kubernetes deployment needed"
+            echo "🚀 Manual deployment requested"
+            
+          # Handle push to main branch
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "Push to main branch detected"
+            
+            # Get changed files from the push
+            changed_files=$(git diff --name-only ${{ github.event.before }}..${{ github.event.after }})
+            echo "Changed files:"
+            echo "$changed_files"
+            
+            # Check for loc1 changes
+            loc1_k8s_changed=false
+            if echo "$changed_files" | grep -E "^inputs/loc1/(agent-deployment\.yml|kustomization\.yml|elastic-agent\.yml)$"; then
+              loc1_k8s_changed=true
+              echo "✅ loc1 has Kubernetes-related changes"
+            fi
+            
+            # Check for loc2 changes
+            loc2_k8s_changed=false
+            if echo "$changed_files" | grep -E "^inputs/loc2/(agent-deployment\.yml|kustomization\.yml|elastic-agent\.yml)$"; then
+              loc2_k8s_changed=true
+              echo "✅ loc2 has Kubernetes-related changes"
+            fi
+            
+            # Set outputs
+            echo "loc1_changed=$loc1_k8s_changed" >> $GITHUB_OUTPUT
+            echo "loc2_changed=$loc2_k8s_changed" >> $GITHUB_OUTPUT
+            
+            if [[ "$loc1_k8s_changed" == "true" || "$loc2_k8s_changed" == "true" ]]; then
+              echo "deploy_needed=true" >> $GITHUB_OUTPUT
+              echo "🚀 Kubernetes deployment needed"
+            else
+              echo "deploy_needed=false" >> $GITHUB_OUTPUT
+              echo "❌ No Kubernetes deployment needed"
+            fi
           fi
 
   deploy-loc1:
@@ -85,7 +128,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
 
       - name: Create deployment status
         uses: actions/github-script@v6
@@ -95,7 +138,7 @@ jobs:
             const deployment = await github.rest.repos.createDeployment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              ref: '${{ github.event.workflow_run.head_sha }}',
+              ref: '${{ github.sha }}',
               environment: 'kubernetes-loc1',
               description: 'Deploying Elastic Agent to loc1',
               auto_merge: false,
@@ -140,13 +183,19 @@ jobs:
         run: |
           cd inputs/loc1
           
-          # Dry-run validation with kubectl apply -k
+          # Dry-run validation
           echo "Performing dry-run validation..."
+          echo "✓ Validating kustomization (ConfigMap)..."
           kubectl apply -k . --dry-run=server -n $NAMESPACE
+          echo "✓ Validating agent-deployment.yml..."
+          kubectl apply -f agent-deployment.yml --dry-run=server -n $NAMESPACE
           
-          # Apply deployment with kubectl apply -k
+          # Apply deployment
           echo "Applying deployment..."
+          echo "✓ Applying kustomization (ConfigMap)..."
           kubectl apply -k . -n $NAMESPACE
+          echo "✓ Applying agent-deployment.yml..."
+          kubectl apply -f agent-deployment.yml -n $NAMESPACE
           
           # Wait for deployment
           echo "Waiting for deployment..."
@@ -156,6 +205,7 @@ jobs:
           echo "Verifying deployment..."
           kubectl get pods -n $NAMESPACE -l app=elastic-agent
           kubectl get configmap elastic-agent-config -n $NAMESPACE
+          kubectl get deployment elastic-agent -n $NAMESPACE
 
       - name: Update deployment status - Success
         if: success()
@@ -202,7 +252,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
 
       - name: Create deployment status
         uses: actions/github-script@v6
@@ -212,7 +262,7 @@ jobs:
             const deployment = await github.rest.repos.createDeployment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              ref: '${{ github.event.workflow_run.head_sha }}',
+              ref: '${{ github.sha }}',
               environment: 'kubernetes-loc2',
               description: 'Deploying Elastic Agent to loc2',
               auto_merge: false,
@@ -257,13 +307,19 @@ jobs:
         run: |
           cd inputs/loc2
           
-          # Dry-run validation with kubectl apply -k
+          # Dry-run validation
           echo "Performing dry-run validation..."
+          echo "✓ Validating kustomization (ConfigMap)..."
           kubectl apply -k . --dry-run=server -n $NAMESPACE
+          echo "✓ Validating agent-deployment.yml..."
+          kubectl apply -f agent-deployment.yml --dry-run=server -n $NAMESPACE
           
-          # Apply deployment with kubectl apply -k
+          # Apply deployment
           echo "Applying deployment..."
+          echo "✓ Applying kustomization (ConfigMap)..."
           kubectl apply -k . -n $NAMESPACE
+          echo "✓ Applying agent-deployment.yml..."
+          kubectl apply -f agent-deployment.yml -n $NAMESPACE
           
           # Wait for deployment
           echo "Waiting for deployment..."
@@ -273,6 +329,7 @@ jobs:
           echo "Verifying deployment..."
           kubectl get pods -n $NAMESPACE -l app=elastic-agent
           kubectl get configmap elastic-agent-config -n $NAMESPACE
+          kubectl get deployment elastic-agent -n $NAMESPACE
 
       - name: Update deployment status - Success
         if: success()
@@ -321,10 +378,17 @@ jobs:
             const loc2Changed = '${{ needs.detect-changes.outputs.loc2_changed }}' === 'true';
             const loc1Result = '${{ needs.deploy-loc1.result }}';
             const loc2Result = '${{ needs.deploy-loc2.result }}';
+            const triggerType = '${{ github.event_name }}';
             
             let comment = `## 🚀 Kubernetes Deployment Summary\n\n`;
-            comment += `**Triggered by**: ${{ github.event.workflow_run.name }}\n`;
-            comment += `**Commit**: ${{ github.event.workflow_run.head_sha }}\n\n`;
+            
+            if (triggerType === 'workflow_dispatch') {
+              comment += `**Triggered by**: Manual deployment\n`;
+              comment += `**Environment**: ${{ github.event.inputs.environment }}\n`;
+            } else {
+              comment += `**Triggered by**: Push to main branch\n`;
+            }
+            comment += `**Commit**: ${{ github.sha }}\n\n`;
             
             comment += `### Deployment Results\n\n`;
             
@@ -355,22 +419,29 @@ jobs:
             
             comment += `\`\`\`\n`;
             
-            // Find the original PR that triggered this
-            const workflowRun = await github.rest.actions.getWorkflowRun({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: ${{ github.event.workflow_run.id }}
-            });
-            
-            if (workflowRun.data.pull_requests && workflowRun.data.pull_requests.length > 0) {
-              const prNumber = workflowRun.data.pull_requests[0].number;
-              
-              await github.rest.issues.createComment({
+            // For manual deployments, just log the summary
+            if (triggerType === 'workflow_dispatch') {
+              console.log('Manual deployment summary:', comment);
+            } else {
+              // For push events, try to find related PRs
+              const prs = await github.rest.pulls.list({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: prNumber,
-                body: comment
+                state: 'open',
+                head: `${context.repo.owner}:main`
               });
+              
+              if (prs.data.length > 0) {
+                const prNumber = prs.data[0].number;
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  body: comment
+                });
+              } else {
+                console.log('No open PRs found, deployment summary:', comment);
+              }
             }
 
   skip-deployment:
