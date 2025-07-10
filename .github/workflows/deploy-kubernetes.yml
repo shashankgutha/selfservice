@@ -130,12 +130,6 @@ jobs:
           chmod 600 ~/.kube/config
           kubectl cluster-info
 
-      - name: Set up tools
-        run: |
-          # Install kustomize
-          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
-          sudo mv kustomize /usr/local/bin/
-
       - name: Prepare namespace
         run: |
           NAMESPACE="elastic-agents-loc1"
@@ -146,17 +140,13 @@ jobs:
         run: |
           cd inputs/loc1
           
-          # Build kustomization
-          echo "Building kustomization..."
-          kustomize build . > /tmp/deployment-loc1.yml
+          # Dry-run validation with kubectl apply -k
+          echo "Performing dry-run validation..."
+          kubectl apply -k . --dry-run=server -n $NAMESPACE
           
-          # Dry-run validation
-          echo "Performing dry-run..."
-          kubectl apply --dry-run=server -f /tmp/deployment-loc1.yml -n $NAMESPACE
-          
-          # Apply deployment
+          # Apply deployment with kubectl apply -k
           echo "Applying deployment..."
-          kubectl apply -f /tmp/deployment-loc1.yml -n $NAMESPACE
+          kubectl apply -k . -n $NAMESPACE
           
           # Wait for deployment
           echo "Waiting for deployment..."
@@ -257,12 +247,6 @@ jobs:
           chmod 600 ~/.kube/config
           kubectl cluster-info
 
-      - name: Set up tools
-        run: |
-          # Install kustomize
-          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
-          sudo mv kustomize /usr/local/bin/
-
       - name: Prepare namespace
         run: |
           NAMESPACE="elastic-agents-loc2"
@@ -273,17 +257,13 @@ jobs:
         run: |
           cd inputs/loc2
           
-          # Build kustomization
-          echo "Building kustomization..."
-          kustomize build . > /tmp/deployment-loc2.yml
+          # Dry-run validation with kubectl apply -k
+          echo "Performing dry-run validation..."
+          kubectl apply -k . --dry-run=server -n $NAMESPACE
           
-          # Dry-run validation
-          echo "Performing dry-run..."
-          kubectl apply --dry-run=server -f /tmp/deployment-loc2.yml -n $NAMESPACE
-          
-          # Apply deployment
+          # Apply deployment with kubectl apply -k
           echo "Applying deployment..."
-          kubectl apply -f /tmp/deployment-loc2.yml -n $NAMESPACE
+          kubectl apply -k . -n $NAMESPACE
           
           # Wait for deployment
           echo "Waiting for deployment..."
