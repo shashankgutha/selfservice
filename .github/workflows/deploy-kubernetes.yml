@@ -38,12 +38,23 @@ env:
 jobs:
   detect-changes:
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
     outputs:
       loc1_changed: ${{ steps.detect.outputs.loc1_changed }}
       loc2_changed: ${{ steps.detect.outputs.loc2_changed }}
       deploy_needed: ${{ steps.detect.outputs.deploy_needed }}
     
     steps:
+      - name: Check branch restriction
+        run: |
+          if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
+            echo "❌ This workflow can only be run on the main branch"
+            echo "Current branch: ${{ github.ref }}"
+            echo "Required branch: refs/heads/main"
+            exit 1
+          fi
+          echo "✅ Running on main branch"
+
       - name: Checkout code
         uses: actions/checkout@v3
         with:
